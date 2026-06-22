@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
-
+import httpx
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.document import Document
@@ -23,7 +23,11 @@ def process_document(self, document_id: str, tenant_id: str):
         db.commit()
 
         # ✅ file path se bytes padho
-        with open(document.file_path, "rb") as f:
+        if document.file_path.startswith("http"):
+            response = httpx.get(document.file_path)
+            file_bytes = response.content
+        else:
+            with open(document.file_path, "rb") as f:
             file_bytes = f.read()
 
         # ✅ bytes pass karo

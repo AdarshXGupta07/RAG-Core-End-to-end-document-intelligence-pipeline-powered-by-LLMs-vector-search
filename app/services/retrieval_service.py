@@ -8,11 +8,10 @@ def retrieve_chunks(
     query: str,
     tenant_id: str,
     db: Session,
-    top_k: int = 8,               # 5 → 8: zyada context
-    similarity_threshold: float = 0.3  # garbage chunks filter
+    top_k: int = 8
 ) -> List[Dict]:
     """
-    Vector similarity search with threshold filtering.
+    Vector similarity search.
     Sirf current tenant ke chunks mein search karega.
     """
 
@@ -33,15 +32,13 @@ def retrieve_chunks(
                 ON c.document_id = d.id
             WHERE c.tenant_id = :tenant_id
               AND c.embedding IS NOT NULL
-              AND 1 - (c.embedding <=> CAST(:embedding AS vector)) >= :threshold
             ORDER BY c.embedding <=> CAST(:embedding AS vector)
             LIMIT :top_k
         """),
         {
             "embedding": embedding_str,
             "tenant_id": tenant_id,
-            "top_k": top_k,
-            "threshold": similarity_threshold
+            "top_k": top_k
         }
     )
 

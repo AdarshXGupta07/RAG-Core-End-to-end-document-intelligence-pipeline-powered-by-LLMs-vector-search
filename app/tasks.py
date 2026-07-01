@@ -31,12 +31,26 @@ def process_document(self, document_id: str, tenant_id: str):
                 file_bytes = f.read()
 
         text = extract_text_from_pdf(file_bytes)
+
+        # FIX 1: NUL bytes strip karo — PostgreSQL inhe reject karta hai
+        text = text.replace('\x00', '').strip()
+
+        # FIX 2: Agar text empty hai (scanned/image PDF) toh early return
+        if not text:
+            document.status = "failed"
+            db.commit()
+            return {"status": "failed", "chunks": 0, "reason": "No text extracted — possibly a scanned/image PDF"}
+
         chunks = chunk_text(text)
 
         chunk_objects = []
         for i, c in enumerate(chunks):
+            # FIX 3: Individual chunk mein bhi NUL ho sakta hai
+            clean_content = c.replace('\x00', '').strip()
+            if not clean_content:
+                continue
             chunk = Chunk(
-                content=c,
+                content=clean_content,
                 chunk_index=i,
                 document_id=document_id,
                 tenant_id=tenant_id,
@@ -60,6 +74,8 @@ def process_document(self, document_id: str, tenant_id: str):
         return {"status": "completed", "chunks": len(chunk_objects)}
 
     except Exception as e:
+        # FIX 4: Session rollback karo warna corrupted state mein rehta hai
+        db.rollback()
         if document:
             document.status = "failed"
             db.commit()

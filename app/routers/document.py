@@ -67,13 +67,17 @@ async def upload_file(
     db.commit()
     db.refresh(document)
 
-    # Celery task queue karo
-    print(f"Queuing task for document {document.id}")
-    result = process_document.delay(
-        document_id=str(document.id),
-        tenant_id=str(current_user.tenant_id)
-    )
-    print(f"Task queued with ID: {result.id}")
+    # Celery task queue karo — wrapped in try/except so upload still works if Redis is down
+    try:
+        print(f"Queuing task for document {document.id}")
+        result = process_document.delay(
+            document_id=str(document.id),
+            tenant_id=str(current_user.tenant_id)
+        )
+        print(f"Task queued with ID: {result.id}")
+    except Exception as e:
+        print(f"Warning: Could not queue Celery task: {e}")
+        # Don't crash — document is saved, just won't be processed automatically
 
     return {
         "document_id": document.id,

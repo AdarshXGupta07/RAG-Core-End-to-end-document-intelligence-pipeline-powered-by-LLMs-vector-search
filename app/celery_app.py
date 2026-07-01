@@ -5,7 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REDIS_URL = os.getenv("REDIS_URL")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+# SSL config only needed for Upstash (rediss://)
+use_ssl = REDIS_URL.startswith("rediss://")
+ssl_config = {"ssl_cert_reqs": ssl.CERT_NONE} if use_ssl else None
 
 celery_app = Celery(
     "rag_platform",
@@ -19,8 +23,10 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     task_track_started=True,
-
-    # ✅ String nahi — ssl.CERT_NONE constant use karo
-    broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
-    redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
 )
+
+if ssl_config:
+    celery_app.conf.update(
+        broker_use_ssl=ssl_config,
+        redis_backend_use_ssl=ssl_config,
+    )
